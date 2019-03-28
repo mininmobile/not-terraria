@@ -103,35 +103,21 @@ function generate(w, h, sh) {
 		surface.push((point + point2 * 0.05) / 1.05);
 	}
 
-	let terrain = Array.from({ length: h }, () => []);
+	let terrain = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
 	
 	for (let i = 0; i < h; i++) {
 		for (let j = 0; j < w; j++) {
-			if (grid(height - surface[j] * height, scale) == i * scale) {
-				terrain[i][j] = 1;
+			let cp = grid(height - surface[j] * height, scale);
 
-				let skip = 0;
-
-				layers.forEach((layer, depth) => {
-					if (depth == layers.length - 1) {
-						for (let l = skip; l < h - i; l++) {
-							if (terrain[i + l + 1])
-								terrain[i + l + 1][j] = layer.id;
-						}
-					} else {
-						let s = skip;
-						for (let l = skip; l < s + layer.thickness; l++) {
-							if (terrain[i + l + 1])
-								terrain[i + l + 1][j] = layer.id;
-							skip++;
-						}
-					}
-				});
+			if (cp == i * scale) {
+				terrain[i][j] = layers[layers.length - 1].id;
+			} else if (cp < i * scale) {
+				terrain[i][j] = layers[layers.length - 1].id;
 			}
 		}
 	}
 
-	// generate caves
+	// generate caves + ores
 
 	for (let i = 0; i < h; i++) {
 		for (let j = 0; j < w; j++) {
@@ -150,6 +136,44 @@ function generate(w, h, sh) {
 							terrain[i][j] = ore.id;
 						}
 					});
+				}
+			}
+		}
+	}
+
+	// add grass and shit
+
+	for (let i = 0; i < sh; i++) {
+		for (let j = 0; j < w; j++) {
+			let isNotCovered = false
+			let isOnRock = terrain[i][j] == layers[layers.length - 1].id;
+
+			if (terrain[i - 1])
+				isNotCovered = terrain[i - 1][j] == 0;
+
+			if (isNotCovered && isOnRock) {
+				terrain[i][j] = 1;
+
+				let skip = 0;
+
+				for (let depth = 0; depth < layers.length - 1; depth++) {
+					let layer = layers[depth];
+
+					let oof = false;
+
+					let s = skip;
+					for (let l = skip; l < s + layer.thickness; l++) {
+						if ((terrain[i + l + 1]) && terrain[i + l + 1][j] == layers[layers.length - 1].id) {
+							terrain[i + l + 1][j] = layer.id;
+							skip++;
+						} else {
+							oof = true;
+							break;
+						}
+					}
+
+					if (oof)
+						break;
 				}
 			}
 		}
