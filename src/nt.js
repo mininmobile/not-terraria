@@ -15,6 +15,9 @@ class Block {
 
 // settings
 let blocks = {
+	// other blocks
+	air: new Block(22, 22, 33),
+	// terrain
 	grass: new Block(0, 200, 0),
 	dirt: new Block(100, 50, 15),
 	stone: new Block(66, 66, 66),
@@ -44,11 +47,15 @@ let xoffset = 0;
 let yoffset = 0;
 let xdirection = 0; // -1 left, 1 right
 let ydirection = 0; // -1 up, 1 down
+let buffer;
 
 // dimensions
 const scale = 20;
 const width = grid(document.body.clientWidth, scale);
 const height = grid(document.body.clientHeight, scale);
+const mapWidth = (width / scale) * 10;
+const mapHeight = (height / scale) * 10;
+const mapSurfaceHeight = height / scale;
 
 // initialize display
 let c = document.createElement("canvas");
@@ -72,10 +79,6 @@ document.addEventListener("keydown", (e) => {
 		case "KeyD": xdirection = 1; break;
 	}
 });
-
-// generate terrain
-let terrain = generate((width / scale) * 10, (height / scale) * 10, height / scale);
-
 document.addEventListener("keyup", (e) => {
 	switch (e.code) {
 		case "KeyW": case "KeyS": ydirection = 0; break;
@@ -83,31 +86,41 @@ document.addEventListener("keyup", (e) => {
 	}
 });
 
+// generate terrain
+let terrain = generate(mapWidth, mapHeight, mapSurfaceHeight);
+buffer = Array.from({ length: mapHeight + mapSurfaceHeight }, () => Array.from({ length: mapWidth }, () => blocks.air));
+
+drawMap(true);
+
 (function render() {
 	window.requestAnimationFrame(render);
 
 	xoffset += xdirection * speed;
 	yoffset += ydirection * speed;
 
-	ctx.fillStyle = "#161621";
-	ctx.fillRect(0, 0, width, height);
+	drawMap();
+})();
 
+function drawMap(override = false) {
 	for (let i = grid(yoffset, scale) / scale; i < height / scale + grid(yoffset, scale) / scale + scale; i++) {
 		if (terrain[i]) for (let j = grid(xoffset, scale) / scale; j < width / scale + grid(xoffset, scale) / scale + scale; j++) {
 			if (terrain[i][j]) {
 				let point = terrain[i][j];
+				let bpoint = buffer[i][j];
 
-				if (point) {
+				if (point != bpoint || override) {
 					let x = grid(j * scale, scale) - xoffset;
 					let y = grid(i * scale, scale) - yoffset;
 
 					ctx.fillStyle = point.toString();
 					ctx.fillRect(x, y, scale, scale);
+
+					buffer[i][j] = point;
 				}
 			}
 		}
 	}
-})();
+}
 
 function generate(w, h, sh) {
 	// initialize
@@ -127,7 +140,7 @@ function generate(w, h, sh) {
 		surface.push((point + point2 * 0.05) / 1.05);
 	}
 
-	let terrain = Array.from({ length: h }, () => Array.from({ length: w }));
+	let terrain = Array.from({ length: h }, () => Array.from({ length: w }, () => blocks.air));
 	
 	for (let i = 0; i < h; i++) {
 		for (let j = 0; j < w; j++) {
@@ -147,7 +160,7 @@ function generate(w, h, sh) {
 			let point2 = (simplex.noise2D(j / 10, i / 10) + 1) / 2
 
 			if ((point + point2 * 0.05) / 1.05 > 0.8) {
-				terrain[i][j] = undefined;
+				terrain[i][j] = blocks.air;
 			} else {
 				if (terrain[i][j] == layers[layers.length - 1].block) {
 					ores.forEach((ore) => {
@@ -171,7 +184,7 @@ function generate(w, h, sh) {
 			let isOnRock = terrain[i][j] == layers[layers.length - 1].block;
 
 			if (terrain[i - 1])
-				isNotCovered = !terrain[i - 1][j];
+				isNotCovered = terrain[i - 1][j] == blocks.air;
 
 			if (isNotCovered && isOnRock) {
 				terrain[i][j] = blocks.grass;
@@ -185,7 +198,7 @@ function generate(w, h, sh) {
 
 					let s = skip;
 					for (let l = skip; l < s + layer.thickness; l++) {
-						if ((terrain[i + l + 1]) && terrain[i + l + 1][j] == layers[layers.length - 1].block) {
+						if (terrain[i + l + 1] && terrain[i + l + 1][j] == layers[layers.length - 1].block) {
 							terrain[i + l + 1][j] = layer.block;
 							skip++;
 						} else {
