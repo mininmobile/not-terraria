@@ -1,16 +1,40 @@
 const simplex = new SimplexNoise("seed");
 
+class Block {
+	constructor(r = 250, g = 250, b = 250, a = 1) {
+		this.r = r;
+		this.g = g;
+		this.b = b;
+		this.a = a;
+	}
+
+	toString() {
+		return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a})`;
+	}
+}
+
 // settings
+let blocks = {
+	grass: new Block(0, 200, 0),
+	dirt: new Block(100, 50, 15),
+	stone: new Block(66, 66, 66),
+	// ores
+	coal: new Block(40, 40, 40),
+	iron: new Block(235, 235, 235),
+	gold: new Block(230, 200, 50),
+}
+
 let ores = [
-	{ rarity: 0.1, id: 0.15 },
-	{ rarity: 0.1, id: 0.075 },
-	{ rarity: 0.1, id: 0.025 },
+	// rarities are not final
+	{ rarity: 0.1, block: blocks.coal },
+	{ rarity: 0.1, block: blocks.iron },
+	{ rarity: 0.1, block: blocks.gold },
 ]
 
 let layers = [
-	{ thickness: 3, id: 0.75 },
-	{ thickness: 5, id: 0.5 },
-	{ thickness: -1, id: 0.25 },
+	// layers are not final
+	{ thickness: 4, block: blocks.dirt },
+	{ thickness: -1, block: blocks.stone },
 ]
 
 let speed = 10;
@@ -73,11 +97,11 @@ document.addEventListener("keyup", (e) => {
 			if (terrain[i][j]) {
 				let point = terrain[i][j];
 
-				if (point > 0) {
+				if (point) {
 					let x = grid(j * scale, scale) - xoffset;
 					let y = grid(i * scale, scale) - yoffset;
 
-					ctx.fillStyle = `rgba(250, 250, 250, ${point})`;
+					ctx.fillStyle = point.toString();
 					ctx.fillRect(x, y, scale, scale);
 				}
 			}
@@ -89,7 +113,7 @@ function generate(w, h, sh) {
 	// initialize
 
 	ores.forEach((ore, i) => {
-		ores[i].offset = Math.random() * 1024;
+		ores[i].offset = Math.random() * 69420212102496;
 	});
 
 	// generate surface + fill height
@@ -103,16 +127,14 @@ function generate(w, h, sh) {
 		surface.push((point + point2 * 0.05) / 1.05);
 	}
 
-	let terrain = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
+	let terrain = Array.from({ length: h }, () => Array.from({ length: w }));
 	
 	for (let i = 0; i < h; i++) {
 		for (let j = 0; j < w; j++) {
 			let cp = grid(height - surface[j] * height, scale);
 
-			if (cp == i * scale) {
-				terrain[i][j] = layers[layers.length - 1].id;
-			} else if (cp < i * scale) {
-				terrain[i][j] = layers[layers.length - 1].id;
+			if (cp == i * scale || cp < i * scale) {
+				terrain[i][j] = layers[layers.length - 1].block;
 			}
 		}
 	}
@@ -125,15 +147,15 @@ function generate(w, h, sh) {
 			let point2 = (simplex.noise2D(j / 10, i / 10) + 1) / 2
 
 			if ((point + point2 * 0.05) / 1.05 > 0.8) {
-				terrain[i][j] = 0;
+				terrain[i][j] = undefined;
 			} else {
-				if (terrain[i][j] == layers[layers.length - 1].id) {
+				if (terrain[i][j] == layers[layers.length - 1].block) {
 					ores.forEach((ore) => {
 						let opoint = (simplex.noise3D(j / 100, i / 100, ore.offset) + 1) / 2;
 						let opoint2 = (simplex.noise3D(j / 10, i / 10, ore.offset) + 1) / 2
 
 						if ((opoint + opoint2 * 0.05) / 1.05 < ore.rarity) {
-							terrain[i][j] = ore.id;
+							terrain[i][j] = ore.block;
 						}
 					});
 				}
@@ -145,14 +167,14 @@ function generate(w, h, sh) {
 
 	for (let i = 0; i < sh; i++) {
 		for (let j = 0; j < w; j++) {
-			let isNotCovered = false
-			let isOnRock = terrain[i][j] == layers[layers.length - 1].id;
+			let isNotCovered = false;
+			let isOnRock = terrain[i][j] == layers[layers.length - 1].block;
 
 			if (terrain[i - 1])
-				isNotCovered = terrain[i - 1][j] == 0;
+				isNotCovered = !terrain[i - 1][j];
 
 			if (isNotCovered && isOnRock) {
-				terrain[i][j] = 1;
+				terrain[i][j] = blocks.grass;
 
 				let skip = 0;
 
@@ -163,8 +185,8 @@ function generate(w, h, sh) {
 
 					let s = skip;
 					for (let l = skip; l < s + layer.thickness; l++) {
-						if ((terrain[i + l + 1]) && terrain[i + l + 1][j] == layers[layers.length - 1].id) {
-							terrain[i + l + 1][j] = layer.id;
+						if ((terrain[i + l + 1]) && terrain[i + l + 1][j] == layers[layers.length - 1].block) {
+							terrain[i + l + 1][j] = layer.block;
 							skip++;
 						} else {
 							oof = true;
